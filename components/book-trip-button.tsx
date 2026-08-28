@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { CheckoutModal } from '@/components/checkout-modal'
+import { WaitlistModal } from '@/components/waitlist-modal'
 
 type Props = {
   destination: string
@@ -24,9 +24,8 @@ export function BookTripButton({ destination, price, slug }: Props) {
       </Button>
 
       {open && (
-        <CheckoutModal
-          item={{ kind: 'trip-deposit', id: slug }}
-          title={`Reserve ${destination}`}
+        <WaitlistModal
+          trip={{ id: slug, title: destination, month: 'Featured trip' }}
           onClose={() => setOpen(false)}
         />
       )}
