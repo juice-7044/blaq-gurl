@@ -1,6 +1,7 @@
 'use server'
 
 import { upsertContact, sendTransactionalEmail } from '@/lib/hubspot'
+import { syncNewsletter, syncWaitlist } from '@/lib/integrations/ghl'
 
 export type LeadState = {
   status: 'idle' | 'success' | 'error'
@@ -33,6 +34,15 @@ export async function joinWaitlist(
   }
 
   const { firstname, lastname } = splitName(name)
+
+  const ghl = await syncWaitlist({
+    email,
+    firstname,
+    lastname,
+    tripId,
+    tripName: tripTitle ? `${tripMonth} 2027 — ${tripTitle}` : '2027 lineup',
+  })
+  if (!ghl.ok && !ghl.skipped) console.log('[v0] GHL waitlist sync unavailable')
 
   const result = await upsertContact({
     email,
@@ -92,6 +102,9 @@ export async function subscribeNewsletter(
   if (!email || !email.includes('@')) {
     return { status: 'error', message: 'Please enter a valid email address.' }
   }
+
+  const ghl = await syncNewsletter({ email })
+  if (!ghl.ok && !ghl.skipped) console.log('[v0] GHL newsletter sync unavailable')
 
   const result = await upsertContact({
     email,

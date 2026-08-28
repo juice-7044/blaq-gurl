@@ -3,6 +3,7 @@
 import { stripe } from '@/lib/stripe'
 import { destinations } from '@/lib/site-data'
 import { events } from '@/lib/events'
+import { randomUUID } from 'node:crypto'
 
 export type CheckoutItem =
   | { kind: 'trip-deposit'; id: string }
@@ -47,6 +48,9 @@ function resolveLineItem(item: CheckoutItem): LineItem {
 
 export async function startCheckoutSession(item: CheckoutItem) {
   const line = resolveLineItem(item)
+  const isTrip = item.kind === 'trip-deposit'
+  const trip = isTrip ? destinations.find((d) => d.slug === item.id) : undefined
+  const externalReservationId = isTrip ? randomUUID() : undefined
 
   const session = await stripe.checkout.sessions.create({
     ui_mode: 'embedded_page',
@@ -65,7 +69,25 @@ export async function startCheckoutSession(item: CheckoutItem) {
       },
     ],
     mode: 'payment',
+    customer_creation: 'always',
+    metadata: {
+      paymentType: item.kind,
+      ...(isTrip && trip && externalReservationId
+        ? {
+            externalReservationId,
+            tripId: trip.slug,
+            tripName: trip.name,
+          }
+        : {}),
+    },
   })
 
+  if (isTrip && trip && externalReservationId && session.id) {
+    // The customer email is collected by Checkout; the verified webhook will
+    // complete the GHL opportunity once Stripe confirms the session.
+    console.log('[v0] Reservation checkout created:', externalReservationId)
+  }
+
+  if (!session.client_secret) throw new Error('Stripe did not return a checkout client secret')
   return session.client_secret
 }
