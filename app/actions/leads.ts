@@ -17,67 +17,49 @@ function splitName(full: string) {
  * details, upserts the contact in HubSpot with waitlist tags, and sends a
  * confirmation email.
  */
-export async function joinWaitlist(
+export async function reserveTrip(
   _prev: LeadState,
   formData: FormData,
 ): Promise<LeadState> {
   const name = String(formData.get('name') ?? '').trim()
   const email = String(formData.get('email') ?? '').trim()
+  const phone = String(formData.get('phone') ?? '').trim()
   const tripId = String(formData.get('tripId') ?? '').trim()
   const tripTitle = String(formData.get('tripTitle') ?? '').trim()
   const tripMonth = String(formData.get('tripMonth') ?? '').trim()
 
   if (!name) return { status: 'error', message: 'Please enter your name.' }
-  if (!email || !email.includes('@')) {
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
     return { status: 'error', message: 'Please enter a valid email address.' }
+  }
+  if (!phone || phone.replace(/\D/g, '').length < 7) {
+    return { status: 'error', message: 'Please enter a valid phone number.' }
+  }
+  if (!tripId || !tripTitle || !tripMonth) {
+    return { status: 'error', message: 'Please select a trip to reserve.' }
   }
 
   const { firstname, lastname } = splitName(name)
-
+  const trip = `${tripMonth} 2027 — ${tripTitle}`
   const result = await upsertContact({
     email,
     firstname,
     lastname,
-    tags: ['#waitlist', tripTitle ? `#${tripMonth}-trip` : '#trip-waitlist'],
     properties: {
-      bgm_waitlist_trip: tripTitle
-        ? `${tripMonth} 2027 — ${tripTitle}`
-        : 'General 2027 waitlist',
-      bgm_waitlist_trip_id: tripId,
+      phone,
+      bgm_reserved_trip: trip,
+      bgm_reserved_trip_id: tripId,
     },
+    tags: ['#reservation', `#${tripMonth.toLowerCase()}-${tripTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`],
   })
 
   if (result.skipped) {
-    // HubSpot not configured yet — still show success so the UX isn't blocked.
-    console.log('[v0] Waitlist: HubSpot not configured, lead not persisted.')
-    return {
-      status: 'success',
-      message:
-        'Thanks! We\u2019ve received your request and will reach out as soon as reservations open.',
-    }
+    console.log('[v0] Reservation: HubSpot not configured, lead not persisted.')
+    return { status: 'success', message: `Thanks! We received your reservation request for ${trip}. We’ll be in touch shortly.` }
   }
+  if (!result.ok) return { status: 'error', message: 'Something went wrong on our end. Please try again shortly.' }
 
-  if (!result.ok) {
-    return {
-      status: 'error',
-      message: 'Something went wrong on our end. Please try again shortly.',
-    }
-  }
-
-  await sendTransactionalEmail({
-    emailId: process.env.HUBSPOT_WAITLIST_EMAIL_ID,
-    to: email,
-    customProperties: {
-      trip: tripTitle ? `${tripMonth} 2027 — ${tripTitle}` : '2027 lineup',
-      firstname,
-    },
-  })
-
-  return {
-    status: 'success',
-    message:
-      'You\u2019re on the list! We\u2019ve emailed a confirmation and will update you the moment we open reservations.',
-  }
+  return { status: 'success', message: `Thanks! Your reservation request for ${trip} is in. We’ll be in touch shortly.` }
 }
 
 /**
