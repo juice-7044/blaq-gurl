@@ -69,6 +69,10 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
+        <script
+          src="https://links.getcaros.com/js/external-tracking.js"
+          data-tracking-id="tk_7f4c4441a3904c37a0ef258ab0f600e2"
+        />
       </body>
     </html>
   )
