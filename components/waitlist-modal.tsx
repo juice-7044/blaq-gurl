@@ -4,7 +4,7 @@ import { useActionState, useEffect } from 'react'
 import { useFormStatus } from 'react-dom'
 import { X, Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { joinWaitlist, type LeadState } from '@/app/actions/leads'
+import { reserveTrip, type LeadState } from '@/app/actions/leads'
 
 const initialState: LeadState = { status: 'idle', message: '' }
 
@@ -22,7 +22,7 @@ function SubmitButton() {
           Submitting...
         </>
       ) : (
-        'Join the waitlist'
+        'Send reservation request'
       )}
     </Button>
   )
@@ -41,7 +41,7 @@ export function WaitlistModal({
   trip: WaitlistTrip
   onClose: () => void
 }) {
-  const [state, formAction] = useActionState(joinWaitlist, initialState)
+  const [state, formAction] = useActionState(reserveTrip, initialState)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -99,11 +99,10 @@ export function WaitlistModal({
               id="waitlist-title"
               className="mt-1 text-balance font-serif text-2xl font-bold text-foreground"
             >
-              Join the {trip.title} waitlist
+              Reserve {trip.title}
             </h3>
             <p className="mt-2 text-pretty text-sm leading-relaxed text-muted-foreground">
-              Leave your details and we&apos;ll notify you the moment
-              reservations open for this trip.
+              Share your details and we&apos;ll confirm your reservation request for this trip.
             </p>
 
             <form action={formAction} className="mt-6 space-y-4">
@@ -141,6 +140,25 @@ export function WaitlistModal({
                   required
                   type="email"
                   placeholder="you@email.com"
+                  className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-foreground outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="wl-phone"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
+                  Phone number
+                </label>
+                <input
+                  id="wl-phone"
+                  name="phone"
+                  required
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder="(555) 123-4567"
                   className="w-full rounded-lg border border-border bg-background px-4 py-2.5 text-foreground outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
