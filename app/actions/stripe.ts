@@ -89,5 +89,5 @@ export async function startCheckoutSession(item: CheckoutItem) {
   }
 
   if (!session.client_secret) throw new Error('Stripe did not return a checkout client secret')
-  return session.client_secret
+  return String(session.client_secret)
 }
