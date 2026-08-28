@@ -71,13 +71,13 @@ export async function subscribeNewsletter(
 ): Promise<LeadState> {
   const email = String(formData.get('email') ?? '').trim()
 
-  if (!email || !email.includes('@')) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { status: 'error', message: 'Please enter a valid email address.' }
   }
 
   const result = await upsertContact({
     email,
-    tags: ['#newsletter'],
+    tags: ['#newsletter', '#subscriber'],
   })
 
   if (result.skipped) {
@@ -92,10 +92,16 @@ export async function subscribeNewsletter(
     }
   }
 
-  await sendTransactionalEmail({
-    emailId: process.env.HUBSPOT_NEWSLETTER_EMAIL_ID,
-    to: email,
-  })
+  // Confirmation email is optional; a missing template or email add-on should
+  // never turn a successfully saved newsletter contact into a failed signup.
+  try {
+    await sendTransactionalEmail({
+      emailId: process.env.HUBSPOT_NEWSLETTER_EMAIL_ID,
+      to: email,
+    })
+  } catch (error) {
+    console.log('[v0] Newsletter confirmation email skipped:', error)
+  }
 
   return { status: 'success', message: 'You\u2019re in! Watch your inbox.' }
 }
