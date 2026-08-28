@@ -35,6 +35,7 @@ export const metadata: Metadata = {
     type: 'website',
   },
   icons: {
+    shortcut: '/icon.svg',
     icon: [
       {
         url: '/icon-light-32x32.png',

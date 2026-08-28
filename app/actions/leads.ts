@@ -81,14 +81,17 @@ export async function subscribeNewsletter(
   })
 
   if (result.skipped) {
-    console.log('[v0] Newsletter: HubSpot not configured, lead not persisted.')
-    return { status: 'success', message: 'You\u2019re in! Watch your inbox.' }
+    console.log('[v0] Newsletter: HubSpot is not configured; contact was not persisted.')
+    return {
+      status: 'error',
+      message: 'Newsletter signup is temporarily unavailable. Please try again shortly.',
+    }
   }
 
   if (!result.ok) {
     return {
       status: 'error',
-      message: 'Something went wrong. Please try again shortly.',
+      message: 'We couldn\u2019t save your signup. Please try again shortly.',
     }
   }
 
