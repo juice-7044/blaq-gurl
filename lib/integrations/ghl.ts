@@ -5,6 +5,33 @@ const API_VERSION = '2021-07-28'
 const TIMEOUT_MS = 8000
 const PIPELINE_NAME = 'BGM | Trip Reservations'
 
+const CONTACT_FIELDS = {
+  contactType: 'bHtRBiDGgKvXfAcOyK71',
+  tripInterests: '1CPQr2IX2qLUZztUSsjs',
+} as const
+
+const OPPORTUNITY_FIELDS = {
+  externalReservationId: '3iMMXqvMkQTN5RnHar61',
+  paymentStatus: 'FOzNBrzVgkF9tK9oaVtY',
+  amountPaid: 'utAFokVSwVFdcJuwe4Sl',
+  balanceDue: 'YrNCWXMLdDm52Pk3oDfG',
+  tripPrice: 'YnrqiJhBQrnX2DtxEYV5',
+  depositAmount: 'HpT1ctolulYKpmeXp7pp',
+  depositStatus: '2POlI98Z7pCBb5yWsF3P',
+  depositPaidDate: 'mTSeLPN5N2ZF2dMg6GLB',
+  nextPaymentDate: '7bY6RQfvy4tUTrDZsJqt',
+  paymentPlan: 'MEld59hOCQf4v9RvLOeC',
+  checkoutSessionId: 'G40fKfH2n4MCm9OJtP4O',
+  stripeCustomerId: 'tlH8xcdRokqurLEXv4J2',
+  paymentIntentId: 'mzTmFNSBFVQyX13YMjnG',
+  subscriptionId: 'otQbOAjlN49rUACBiwgp',
+  lastStripeSync: '8GOUOux87P3umGsPAxrI',
+  bookingSource: '7ip2SJDAPJQ5CXBFbNMP',
+  destination: 'QDQeq5h3AjR0p3w0G7CN',
+  travelers: 'UbRJicAQtXHQVplD4R72',
+  reservationStatus: 'O2Z9cgNbl3OuxEVSAcX6',
+} as const
+
 export const GHL_STAGES = {
   tripInterest: '02f077a0-1ca8-4706-a1d0-89a9ec5c28e7',
   waitlisted: 'a83bde08-1c02-4386-98b5-385f6c5bba80',
@@ -69,13 +96,32 @@ async function ghlFetch(path: string, init: RequestInit = {}) {
   }
 }
 
+async function mergeContactFields(email: string, fields: Record<string, string | boolean | number>) {
+  const response = await ghlFetch(`/contacts/search/duplicate?locationId=${encodeURIComponent(config()!.locationId)}&email=${encodeURIComponent(email)}`)
+  if (!response?.ok) return fields
+  const body = (await response.json()) as { contact?: { customFields?: Record<string, unknown> } }
+  const existing = body.contact?.customFields ?? {}
+  const merged = { ...fields }
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value !== 'string' || !value.includes(',')) continue
+    const oldValues = Array.isArray(existing[key]) ? existing[key].map(String) : String(existing[key] ?? '').split(',').map((v) => v.trim()).filter(Boolean)
+    merged[key] = Array.from(new Set([...oldValues, ...value.split(',').map((v) => v.trim()).filter(Boolean)])).join(', ')
+  }
+  return merged
+}
+
 export async function upsertBgmContact(input: GhlContactInput): Promise<GhlSyncResult> {
   const auth = config()
   if (!auth) return { ok: false, skipped: true }
   try {
-    const fields = Object.fromEntries(
-      Object.entries(input.customFields ?? {}).filter(([, value]) => value !== undefined && value !== null && value !== ''),
-    )
+    const rawFields = Object.fromEntries(Object.entries(input.customFields ?? {}).filter(([, value]) => value !== undefined && value !== null && value !== ''))
+    const fields = await mergeContactFields(input.email, {
+      ...rawFields,
+      ...(rawFields.bgm_contact_type !== undefined ? { [CONTACT_FIELDS.contactType]: rawFields.bgm_contact_type } : {}),
+      ...(rawFields.trip_interests !== undefined ? { [CONTACT_FIELDS.tripInterests]: rawFields.trip_interests } : {}),
+    })
+    delete fields.bgm_contact_type
+    delete fields.trip_interests
     const response = await ghlFetch('/contacts/upsert', {
       method: 'POST',
       body: JSON.stringify({
@@ -120,6 +166,16 @@ async function pipelineId() {
   return pipeline.id
 }
 
+async function findExistingOpportunity(contactId: string, externalId: string, pid: string) {
+  const auth = config()
+  if (!auth) return { id: undefined, multiple: false }
+  const response = await ghlFetch(`/opportunities/search?location_id=${encodeURIComponent(auth.locationId)}&pipeline_id=${encodeURIComponent(pid)}&contact_id=${encodeURIComponent(contactId)}&page=1&limit=100`)
+  if (!response?.ok) return { id: undefined, multiple: false }
+  const body = (await response.json()) as { opportunities?: Array<{ id: string; customFields?: Record<string, unknown> }> }
+  const matches = (body.opportunities ?? []).filter((opportunity) => String(opportunity.customFields?.[OPPORTUNITY_FIELDS.externalReservationId] ?? opportunity.customFields?.external_reservation_id ?? '') === externalId)
+  return { id: matches.length === 1 ? matches[0].id : undefined, multiple: matches.length > 1 }
+}
+
 export async function upsertBgmOpportunity(input: {
   contactId: string
   name: string
@@ -133,8 +189,10 @@ export async function upsertBgmOpportunity(input: {
   try {
     const pid = await pipelineId()
     if (!pid) return { ok: false }
-    const response = await ghlFetch('/opportunities/', {
-      method: 'POST',
+    const existing = await findExistingOpportunity(input.contactId, input.externalId, pid)
+    if (existing.multiple) return { ok: false }
+    const response = await ghlFetch(existing.id ? `/opportunities/${existing.id}` : '/opportunities/', {
+      method: existing.id ? 'PUT' : 'POST',
       body: JSON.stringify({
         locationId: auth.locationId,
         pipelineId: pid,
@@ -145,8 +203,11 @@ export async function upsertBgmOpportunity(input: {
         monetaryValue: input.amount,
         source: 'Blaq Gurl Moves Website',
         customFields: {
-          external_reservation_id: input.externalId,
-          ...(input.customFields ?? {}),
+          [OPPORTUNITY_FIELDS.externalReservationId]: input.externalId,
+          ...Object.fromEntries(Object.entries(input.customFields ?? {}).map(([key, value]) => {
+            const map: Record<string, string> = { payment_status: OPPORTUNITY_FIELDS.paymentStatus, amount_paid: OPPORTUNITY_FIELDS.amountPaid, balance_due: OPPORTUNITY_FIELDS.balanceDue, trip_price: OPPORTUNITY_FIELDS.tripPrice, deposit_amount: OPPORTUNITY_FIELDS.depositAmount, deposit_status: OPPORTUNITY_FIELDS.depositStatus, deposit_paid_date: OPPORTUNITY_FIELDS.depositPaidDate, next_payment_date: OPPORTUNITY_FIELDS.nextPaymentDate, payment_plan: OPPORTUNITY_FIELDS.paymentPlan, stripe_checkout_session_id: OPPORTUNITY_FIELDS.checkoutSessionId, stripe_customer_id: OPPORTUNITY_FIELDS.stripeCustomerId, stripe_payment_intent_id: OPPORTUNITY_FIELDS.paymentIntentId, stripe_subscription_id: OPPORTUNITY_FIELDS.subscriptionId, last_stripe_sync: OPPORTUNITY_FIELDS.lastStripeSync, booking_source: OPPORTUNITY_FIELDS.bookingSource, destination: OPPORTUNITY_FIELDS.destination, number_of_travelers: OPPORTUNITY_FIELDS.travelers, reservation_status: OPPORTUNITY_FIELDS.reservationStatus }
+            return [map[key] ?? key, value]
+          })),
         },
       }),
     })
