@@ -77,6 +77,9 @@ export async function startCheckoutSession(item: CheckoutItem) {
             externalReservationId,
             tripId: trip.slug,
             tripName: trip.name,
+            destination: trip.country,
+            tripPriceMinor: String(Math.round(trip.price * 100)),
+            depositAmountMinor: String(line.unitAmount),
           }
         : {}),
     },
