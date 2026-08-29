@@ -1,4 +1,5 @@
 import 'server-only'
+import { mergeMultiSelectValues } from '@/lib/phase2/merge-utils'
 
 const API_BASE = 'https://services.leadconnectorhq.com'
 const API_VERSION = '2021-07-28'
@@ -99,13 +100,13 @@ async function ghlFetch(path: string, init: RequestInit = {}) {
 async function mergeContactFields(email: string, fields: Record<string, string | boolean | number>) {
   const response = await ghlFetch(`/contacts/search/duplicate?locationId=${encodeURIComponent(config()!.locationId)}&email=${encodeURIComponent(email)}`)
   if (!response?.ok) return fields
-  const body = (await response.json()) as { contact?: { customFields?: Record<string, unknown> } }
+  const body = (await response.json()) as { contact?: { customFields?: Array<{ id?: string; value?: unknown }> | Record<string, unknown> } }
   const existing = body.contact?.customFields ?? {}
   const merged = { ...fields }
   for (const [key, value] of Object.entries(fields)) {
-    if (typeof value !== 'string' || !value.includes(',')) continue
-    const oldValues = Array.isArray(existing[key]) ? existing[key].map(String) : String(existing[key] ?? '').split(',').map((v) => v.trim()).filter(Boolean)
-    merged[key] = Array.from(new Set([...oldValues, ...value.split(',').map((v) => v.trim()).filter(Boolean)])).join(', ')
+    if (key !== CONTACT_FIELDS.contactType && key !== CONTACT_FIELDS.tripInterests) continue
+    const oldValue = Array.isArray(existing) ? existing.find((field) => field.id === key)?.value : existing[key]
+    merged[key] = mergeMultiSelectValues(oldValue, value).join(', ')
   }
   return merged
 }
@@ -212,7 +213,9 @@ export async function upsertBgmOpportunity(input: {
       }),
     })
     if (!response?.ok) console.log('[v0] GHL opportunity sync failed:', response?.status ?? 'unknown')
-    return { ok: Boolean(response?.ok) }
+    const body = response?.ok ? (await response.json()) as { opportunity?: { id?: string }; id?: string } : null
+    const id = body?.opportunity?.id ?? body?.id ?? existing.id
+    return { ok: Boolean(response?.ok && id), id }
   } catch (error) {
     console.log('[v0] GHL opportunity sync error:', (error as Error).message)
     return { ok: false }
@@ -268,7 +271,7 @@ export async function syncReservationStarted(input: { email: string; tripId: str
     },
   })
   if (!contact.ok || !contact.id) return contact
-  return upsertBgmOpportunity({
+  const opportunity = await upsertBgmOpportunity({
     contactId: contact.id,
     name: `${input.tripName} — Reservation`,
     stageId: GHL_STAGES.reservationStarted,
@@ -281,12 +284,18 @@ export async function syncReservationStarted(input: { email: string; tripId: str
       booking_source: 'Website',
     },
   })
+  if (opportunity.ok && opportunity.id) {
+    const { persistGhlOpportunityId } = await import('@/lib/phase2/crm-sync')
+    const persisted = await persistGhlOpportunityId(input.reservationId, opportunity.id)
+    return persisted.conflict ? { ok: false } : { ...opportunity, ok: persisted.ok }
+  }
+  return opportunity
 }
 
 export async function syncPaymentEvent(input: { email: string; tripName: string; reservationId: string; stageId: string; amount?: number; amountPaid?: number; balanceDue?: number; stripeSessionId?: string; paymentIntentId?: string }) {
   const contact = await upsertBgmContact({ email: input.email, tags: input.stageId === GHL_STAGES.depositPaid || input.stageId === GHL_STAGES.paidInFull ? ['bgm | active traveler'] : undefined })
   if (!contact.ok || !contact.id) return contact
-  return upsertBgmOpportunity({
+  const opportunity = await upsertBgmOpportunity({
     contactId: contact.id,
     name: `${input.tripName} — Reservation`,
     stageId: input.stageId,
@@ -301,4 +310,10 @@ export async function syncPaymentEvent(input: { email: string; tripName: string;
       last_stripe_sync: new Date().toISOString(),
     },
   })
+  if (opportunity.ok && opportunity.id) {
+    const { persistGhlOpportunityId } = await import('@/lib/phase2/crm-sync')
+    const persisted = await persistGhlOpportunityId(input.reservationId, opportunity.id)
+    return persisted.conflict ? { ok: false } : { ...opportunity, ok: persisted.ok }
+  }
+  return opportunity
 }
