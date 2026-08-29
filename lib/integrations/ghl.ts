@@ -13,6 +13,7 @@ export const GHL_STAGES = {
   depositPaid: '1b55a9f9-5536-4beb-85ef-12ca051f47e0',
   paidInFull: '217f2534-6260-4329-a5ba-4a3d5d2f368c',
   refunded: '22bf476f-3f13-4d76-bc24-d52fe9770967',
+  paymentPastDue: process.env.GHL_PAYMENT_PAST_DUE_STAGE_ID ?? 'payment-past-due',
 } as const
 
 export type GhlSyncResult = { ok: boolean; skipped?: boolean; id?: string }
@@ -221,8 +222,8 @@ export async function syncReservationStarted(input: { email: string; tripId: str
   })
 }
 
-export async function syncPaymentEvent(input: { email: string; tripName: string; reservationId: string; stageId: string; amount?: number; stripeSessionId?: string; paymentIntentId?: string }) {
-  const contact = await upsertBgmContact({ email: input.email, tags: input.stageId === GHL_STAGES.depositPaid ? ['bgm | active traveler'] : undefined })
+export async function syncPaymentEvent(input: { email: string; tripName: string; reservationId: string; stageId: string; amount?: number; amountPaid?: number; balanceDue?: number; stripeSessionId?: string; paymentIntentId?: string }) {
+  const contact = await upsertBgmContact({ email: input.email, tags: input.stageId === GHL_STAGES.depositPaid || input.stageId === GHL_STAGES.paidInFull ? ['bgm | active traveler'] : undefined })
   if (!contact.ok || !contact.id) return contact
   return upsertBgmOpportunity({
     contactId: contact.id,
@@ -233,7 +234,9 @@ export async function syncPaymentEvent(input: { email: string; tripName: string;
     customFields: {
       stripe_checkout_session_id: input.stripeSessionId ?? '',
       stripe_payment_intent_id: input.paymentIntentId ?? '',
-      payment_status: input.stageId === GHL_STAGES.depositPaid ? 'Paid' : 'Failed',
+      payment_status: input.stageId === GHL_STAGES.paidInFull ? 'Paid In Full' : input.stageId === GHL_STAGES.depositPaid ? 'Paid' : input.stageId === GHL_STAGES.refunded ? 'Refunded' : 'Payment Past Due',
+      amount_paid: input.amountPaid ?? input.amount ?? 0,
+      balance_due: input.balanceDue ?? 0,
       last_stripe_sync: new Date().toISOString(),
     },
   })
