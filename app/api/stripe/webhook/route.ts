@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { payments, reservations, stripeWebhookEvents } from '@/lib/db/schema'
+import { crmSyncState, payments, reservations, stripeWebhookEvents } from '@/lib/db/schema'
 import { GHL_STAGES, syncPaymentEvent, syncReservationStarted } from '@/lib/integrations/ghl'
 
 export const runtime = 'nodejs'
@@ -14,6 +14,15 @@ function paymentType(metadata: Stripe.Metadata): 'deposit' | 'installment' | 'fu
   if (metadata.paymentType === 'installment') return 'installment'
   if (metadata.paymentType === 'full_payment') return 'full_payment'
   return 'adjustment'
+}
+
+async function syncAndRecord(externalReservationId: string, operation: () => Promise<{ ok: boolean; id?: string }>) {
+  try { const result = await operation(); await recordCrmSync(externalReservationId, result); return result } catch (error) { await recordCrmSync(externalReservationId, { ok: false }, error); return { ok: false } }
+}
+
+async function recordCrmSync(externalReservationId: string, result: { ok: boolean; id?: string }, error?: unknown) {
+  const message = error instanceof Error ? error.message : 'GHL synchronization failed'
+  await db.insert(crmSyncState).values({ externalReservationId, ghlOpportunityId: result.id, lastSyncStatus: result.ok ? 'synced' : 'failed', lastSuccessfulSync: result.ok ? new Date() : undefined, retryCount: result.ok ? 0 : 1, lastError: result.ok ? null : message }).onConflictDoUpdate({ target: crmSyncState.externalReservationId, set: { ghlOpportunityId: result.id, lastSyncStatus: result.ok ? 'synced' : 'failed', lastSuccessfulSync: result.ok ? new Date() : undefined, retryCount: result.ok ? 0 : sql`${crmSyncState.retryCount} + 1`, lastError: result.ok ? null : message, updatedAt: new Date() } })
 }
 
 async function refreshReservation(externalReservationId: string, refundDelta = 0) {
@@ -58,7 +67,11 @@ export async function POST(request: Request) {
     } else if (event.type.startsWith('charge.dispute.')) {
       const charge = object as Stripe.Charge
       const current = await refreshReservation(reservationId)
-      if (current) await syncPaymentEvent({ email: current.travelerEmail, tripName: current.tripName, reservationId, stageId: GHL_STAGES.paymentPastDue, amount: current.amountPaid, amountPaid: current.amountPaid, balanceDue: current.balance, stripeSessionId: charge.id })
+      if (current) {
+        await db.update(reservations).set({ reservationStatus: 'human_review', updatedAt: new Date() }).where(eq(reservations.externalReservationId, reservationId))
+        await db.insert(crmSyncState).values({ externalReservationId: reservationId, lastSyncStatus: 'human_review', lastError: `Stripe dispute requires review: ${event.type}` }).onConflictDoUpdate({ target: crmSyncState.externalReservationId, set: { lastSyncStatus: 'human_review', lastError: `Stripe dispute requires review: ${event.type}`, updatedAt: new Date() } })
+        await syncPaymentEvent({ email: current.travelerEmail, tripName: current.tripName, reservationId, stageId: GHL_STAGES.paymentPastDue, amount: current.amountPaid, amountPaid: current.amountPaid, balanceDue: current.balance, stripeSessionId: charge.id })
+      }
     } else if (successEvents.has(event.type) || event.type === 'checkout.session.async_payment_failed') {
       const session = object as Stripe.Checkout.Session
       const email = session.customer_details?.email
@@ -69,7 +82,7 @@ export async function POST(request: Request) {
         if (!event.type.endsWith('failed')) await tx.insert(payments).values({ externalReservationId: reservationId, stripeEventId: event.id, stripeCheckoutSessionId: session.id, stripePaymentIntentId: typeof session.payment_intent === 'string' ? session.payment_intent : undefined, paymentType: paymentType(metadata), amountMinor: amount, currency: session.currency ?? 'usd', status: 'succeeded', paidAt: new Date() }).onConflictDoNothing()
       })
       const current = await refreshReservation(reservationId)
-      if (current) await (event.type.endsWith('failed') ? syncPaymentEvent({ email, tripName: current.tripName, reservationId, stageId: GHL_STAGES.depositPending, amount, amountPaid: current.amountPaid, balanceDue: current.balance, stripeSessionId: session.id }) : current.full ? syncPaymentEvent({ email, tripName: current.tripName, reservationId, stageId: GHL_STAGES.paidInFull, amount, amountPaid: current.amountPaid, balanceDue: current.balance, stripeSessionId: session.id }) : syncReservationStarted({ email, tripId: current.tripId, tripName: current.tripName, reservationId, amount, stripeSessionId: session.id }))
+      if (current) await syncAndRecord(reservationId, () => event.type.endsWith('failed') ? syncPaymentEvent({ email, tripName: current.tripName, reservationId, stageId: GHL_STAGES.depositPending, amount, amountPaid: current.amountPaid, balanceDue: current.balance, stripeSessionId: session.id }) : current.full ? syncPaymentEvent({ email, tripName: current.tripName, reservationId, stageId: GHL_STAGES.paidInFull, amount, amountPaid: current.amountPaid, balanceDue: current.balance, stripeSessionId: session.id }) : syncReservationStarted({ email, tripId: current.tripId, tripName: current.tripName, reservationId, amount, stripeSessionId: session.id }))
     }
     await db.update(stripeWebhookEvents).set({ processed: true, processingStatus: 'processed', processedAt: new Date(), externalReservationId: reservationId }).where(eq(stripeWebhookEvents.stripeEventId, event.id))
     return NextResponse.json({ received: true })
