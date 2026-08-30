@@ -169,6 +169,29 @@ export type BlogPost = {
 
 export const blogPosts: BlogPost[] = [
   {
+    slug: 'airport-choice-budget-2026',
+    title: 'Flying on a Budget in 2026? Your Airport Choice Might Matter More Than You Think',
+    excerpt:
+      'The airport you fly from can make a bigger difference to your travel budget than you expect. Here is how to compare nearby airports and keep more money for the trip itself.',
+    category: 'Travel Tips',
+    date: 'August 30, 2026',
+    readTime: '7 min read',
+    image: '/images/blog-airport-budget.png',
+    content: [
+      'If you are trying to keep travel costs down this year, there is a simple lever a lot of people overlook: which airport you actually fly out of. New government data on 2025 domestic airfares shows just how big the gap can be between the cheapest and most expensive major airports in the country — and the difference is not small change.',
+      'According to fare data from the U.S. Bureau of Transportation Statistics, the average domestic airfare in 2025 was around $387 — actually down slightly from the year before, marking a third straight year of falling ticket prices. But that national average hides a lot of variation.',
+      'On the low end, South Florida stood out. Fort Lauderdale-Hollywood International posted the cheapest average departing fare of any major U.S. airport, with Orlando close behind. Several other Florida airports also landed among the most affordable in the country.',
+      'On the high end, Anchorage had the priciest average fare among the nation’s busiest airports — over $500 on average. In the lower 48, Birmingham, Alabama topped the list for highest average fares. That is a swing of more than $250 between the cheapest and priciest major airports for what might otherwise be a similar trip.',
+      'Before you book, check nearby alternate airports. If you live within driving distance of more than one, a slightly longer drive to a lower-cost hub can offset the extra gas or rideshare fare many times over.',
+      'Regional airports deserve a look, too. Smaller airports can sometimes undercut nearby major hubs thanks to lower operating costs and less demand-driven pricing. If one is reasonable for your route, add it to your fare comparison.',
+      'Remember that these are averages, not guarantees. An airport with a low average fare will not be cheap on every route or date. Demand, seasonality, and how far out you book still matter.',
+      'Factor in the full cost, not just the ticket. Parking, baggage fees, and ground transportation can eat into savings, especially at airports farther from where you are headed.',
+      'Domestic airfare has fallen for three consecutive years, which is good news for budget-conscious travelers. But rising jet fuel costs have started pushing prices back up more recently, so booking sooner rather than later is not unreasonable when you find a good rate.',
+      'Airport choice is one of the few travel costs fully within your control before you even start comparing ticket prices. A little research into nearby airports can make a real dent in your travel budget this year.',
+      'Fare figures referenced are based on 2025 domestic itinerary fare data from the U.S. Bureau of Transportation Statistics, covering major and regional U.S. airports.',
+    ],
+  },
+  {
     slug: 'solo-but-never-alone',
     title: 'Solo, But Never Alone: The Magic of Group Travel',
     excerpt:
