@@ -199,7 +199,7 @@ export const blogPosts: BlogPost[] = [
     category: 'Community',
     date: 'June 12, 2026',
     readTime: '5 min read',
-    image: '/images/experience-spa.png',
+    image: '/images/blog-solo-group-travel.png',
     content: [
       'There is a particular kind of joy that comes from arriving somewhere new and being met by people who get it. Group travel, when done right, is not about losing your independence — it is about amplifying it.',
       'At Blaq Gurl Moves, every trip is designed so you can do as much or as little as you want. Wander off for a solo museum morning, then reunite with the group for a sunset dinner. The structure is there when you need it and invisible when you do not.',
