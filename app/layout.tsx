@@ -35,19 +35,17 @@ export const metadata: Metadata = {
     type: 'website',
   },
   icons: {
-    shortcut: '/icon.svg',
+    shortcut: '/favicon.ico',
     icon: [
       {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
+        url: '/favicon-96x96.png',
+        type: 'image/png',
+        sizes: '96x96',
       },
       {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: '/favicon.ico',
+        type: 'image/x-icon',
+        sizes: 'any',
       },
     ],
     apple: '/apple-icon.png',
