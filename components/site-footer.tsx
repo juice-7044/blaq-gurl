@@ -29,6 +29,7 @@ const columns = [
       { label: 'Travel Tips', href: '/#tips' },
       { label: 'Newsletter', href: '/#newsletter' },
       { label: 'Contact the Tribe', href: '/#newsletter' },
+      { label: 'Privacy Policy', href: '/privacy' },
     ],
   },
 ]

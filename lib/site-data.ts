@@ -292,7 +292,7 @@ export const blogPosts: BlogPost[] = [
     category: 'Travel Tips',
     date: 'February 20, 2026',
     readTime: '5 min read',
-    image: '/images/experience-spa.png',
+    image: '/images/four-women.jpg',
     archived: true,
     content: [
       'Group travel is a joy, but it thrives on a little grace. Be on time, be flexible, and communicate your needs early.',
@@ -307,7 +307,7 @@ export const blogPosts: BlogPost[] = [
     category: 'Community',
     date: 'January 30, 2026',
     readTime: '4 min read',
-    image: '/images/experience-spa.png',
+    image: '/images/blog-origin-toast.jpg',
     archived: true,
     content: [
       'It started in Napa, on the trip that birthed the sisterhood. One toast turned into the longest, most heartfelt round of gratitude any of us had ever shared.',

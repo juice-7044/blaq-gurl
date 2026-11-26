@@ -282,7 +282,10 @@ export function TribeQuiz() {
           </Button>
           <p className="text-center text-xs text-muted-foreground">
             We&apos;ll email your results and occasional travel inspiration. No
-            spam.
+            spam. See our{' '}
+            <a href="/privacy" className="underline underline-offset-2 hover:text-primary">
+              Privacy Policy
+            </a>.
           </p>
         </form>
       </div>

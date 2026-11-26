@@ -169,6 +169,13 @@ export function WaitlistModal({
                 </p>
               )}
 
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                See our{' '}
+                <a href="/privacy" className="underline underline-offset-2 hover:text-primary">
+                  Privacy Policy
+                </a>{' '}
+                for how we use your information.
+              </p>
               <SubmitButton />
             </form>
           </>

@@ -71,6 +71,12 @@ export function Newsletter() {
                 className="flex-1 rounded-lg border border-transparent bg-background px-4 py-3 text-foreground outline-none focus:ring-2 focus:ring-accent"
               />
               <SubscribeButton />
+              <p className="text-xs leading-relaxed text-primary-foreground/75 sm:col-span-2">
+                By subscribing, you agree to our{' '}
+                <a href="/privacy" className="underline underline-offset-2 hover:text-accent">
+                  Privacy Policy
+                </a>.
+              </p>
             </form>
           )}
           {state.status === 'error' && (
