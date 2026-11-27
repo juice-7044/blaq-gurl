@@ -73,6 +73,14 @@ export default function RootLayout({
           src="https://links.getcaros.com/js/external-tracking.js"
           data-tracking-id="tk_7f4c4441a3904c37a0ef258ab0f600e2"
         />
+        <script
+          src="https://ask.getcaros.com/concierge.js"
+          data-api-base="https://ask.getcaros.com/api/concierge"
+          data-title="Travel concierge"
+          data-subtitle="Text or talk — same conversation"
+          data-brand-color="#111111"
+          data-accent-color="#F2C14E"
+        />
       </body>
     </html>
   )
